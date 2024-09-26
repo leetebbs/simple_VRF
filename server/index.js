@@ -5,7 +5,7 @@ const crypto = require("crypto");
 const express = require("express");
 const app = express();
 const privateKey = process.env.PRIVATE_KEY;
-const contractAddress = process.env.ORACLE_CONTRACT_ADDRESS;
+const contractAddress = "0x48D93Bfccbb24d8cf0C968F187DC5a92c3378bee";
 const contractABI = require("./contractABI");
 const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
 
