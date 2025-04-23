@@ -105,7 +105,7 @@ The ECDSA signature verification works as follows:
    ```
    PRIVATE_KEY=your_oracle_wallet_private_key
    ORACLE_CONTRACT_ADDRESS=0x48D93Bfccbb24d8cf0C968F187DC5a92c3378bee // or your deployed oracle address
-   SCROLL_RPC_URL=https://scroll-public.scroll-testnet.quiknode.pro
+   SCROLL_RPC_URL=<Your Scroll RPC URL>
    ```
 
 3. Start the oracle server:
