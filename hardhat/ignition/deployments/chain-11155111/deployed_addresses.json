@@ -1,0 +1,5 @@
+{
+  "OracleRandomNumberModule#OracleRandomNumber": "0x7f18276fc5e832a60073bEAe5EcfE3C58A460187",
+  "RandomNumberConsumerModule#RandomNumberConsumer": "0xc54f5Ee3dffdDeBb448C85392f155e2DaC67b546",
+  "TestOracleRandomNumberModule#TestOracleRandomNumber": "0xB629E3101024Ce444829C56a49BF6E09a60883c8"
+}

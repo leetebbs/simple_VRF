@@ -1,111 +1,136 @@
-## Simple VRF System
 
-This project implements a decentralized VRF (Verifiable Random Function) oracle system on the blockchain, with three main components:
+# Simple VRF System
 
-1. **Smart Contracts** - Manages random number requests and verification on-chain
-2. **Oracle Server** - Generates secure random numbers and signs them cryptographically 
-3. **Client Application** - Provides a user interface for interacting with the VRF system
+A decentralized Verifiable Random Function (VRF) system implemented on EVM-compatible blockchains. This system provides secure, verifiable random numbers through a three-component architecture.
 
-## Project Structure
+## System Architecture
 
-```
-simple_VRF/
-├── client/             # Frontend application built with React + Vite
-├── hardhat/            # Smart contract development environment
-│   ├── contracts/      # Solidity smart contracts
-│   ├── ignition/       # Deployment modules
-│   ├── scripts/        # Utility scripts
-│   └── test/           # Contract test files
-└── server/             # Oracle server that generates and signs random numbers
-```
+This project consists of three main components:
 
-## Components
+1. **Smart Contracts** - Core blockchain logic for random number requests and verification
+2. **Oracle Server** - Off-chain service that generates and signs random numbers
+3. **Client Application** - React-based frontend for interacting with the system
 
-### Smart Contracts
+## How It Works
 
-The project includes two main smart contracts:
-- **OracleRandomNumber**: The core contract that manages random number requests and verification
-- **TestOracleRandomNumber**: An example contract for testing the random number generation functionality
+### Random Number Request Flow
 
-Key features:
-- Request random numbers from the blockchain
-- Cryptographic verification of oracle-provided random numbers
-- Event emissions for request and fulfillment tracking
+1. A user interacts with the client application to request a random number
+2. The request is sent to the `V2TestOracleRandomNumber` contract, which forwards it to the `OracleRandomNumber` contract
+3. The `OracleRandomNumber` contract:
+   - Assigns a unique request ID
+   - Stores the request details
+   - Emits a `RandomNumberRequested` event
 
-### Oracle Server
+### Oracle Server Process
 
-The server component listens for random number requests from the smart contract and provides cryptographically verifiable responses.
+1. The oracle server (index.js) listens for `RandomNumberRequested` events
+2. When an event is detected, the server:
+   - Generates a random number using `ethers.toBigInt(ethers.randomBytes(32))`
+   - Creates a message hash combining the request ID and random number
+   - Signs this hash using the oracle's private key (ECDSA signature)
+   - Calls the `fulfillRandomNumber` function with the random number and signature
 
-Features:
-- Event listening for `RandomNumberRequested` events
-- Secure random number generation
-- Cryptographic signing of random numbers
-- Submission of random numbers back to the smart contract
+### ECDSA Verification Process
 
-### Client Application
+The ECDSA signature verification works as follows:
 
-A React-based frontend for interacting with the VRF system.
+1. **Signature Creation** (Server-side):
+   ```javascript
+   // Create message hash from requestId and randomNumber
+   const messageHash = ethers.keccak256(
+     ethers.AbiCoder.defaultAbiCoder().encode(
+       ["uint256", "uint256"],
+       [requestId, randomNumber]
+     )
+   );
+   // Sign the message hash with the oracle's private key
+   const signature = await wallet.signMessage(ethers.getBytes(messageHash));
+   ```
 
-## Setup and Configuration
+2. **Signature Verification** (Contract-side):
+   ```solidity
+   function verifySignature(uint256 _requestId, uint256 _randomNumber, bytes memory _signature) internal view returns (bool) {
+       // Create the same message hash
+       bytes32 messageHash = keccak256(abi.encodePacked(_requestId, _randomNumber));
+       // Get Ethereum signed message hash
+       bytes32 ethSignedMessageHash = getEthSignedMessageHash(messageHash);
+       // Recover signer from signature and verify it matches the oracle address
+       return recoverSigner(ethSignedMessageHash, _signature) == oracle;
+   }
+   ```
+
+3. The contract only accepts the random number if the recovered signer matches the authorized oracle address
+
+## Setup Instructions
 
 ### Prerequisites
+
 - Node.js (v14+)
 - NPM or Yarn
 - MetaMask or another Ethereum wallet
+- Access to Scroll Sepolia testnet (or other EVM-compatible network)
 
-### Environment Variables
+### Smart Contract Deployment
 
-#### Hardhat (.env)
-```
-ALCHEMY_KEY=your_alchemy_api_key
-P_KEY=your_private_key
-RPC_URL=your_rpc_endpoint
-SCROLL_KEY=your_scroll_scan_api_key
-```
+1. Navigate to the Hardhat directory:
+   ```bash
+   cd hardhat
+   npm install
+   ```
 
-#### Server (.env)
-```
-PRIVATE_KEY=your_oracle_wallet_private_key
-ORACLE_CONTRACT_ADDRESS=deployed_contract_address
-RPC_URL=your_rpc_endpoint
-```
+2. Create a `.env` file with:
+   ```
+   ALCHEMY_KEY=your_alchemy_api_key
+   P_KEY=your_private_key
+   RPC_URL=your_rpc_endpoint
+   SCROLL_KEY=your_scroll_scan_api_key
+   ```
 
-#### Client (.env)
-See .env.example in the client directory
+3. Deploy the contracts:
+   ```bash
+   npx hardhat ignition deploy ./ignition/modules/Oracle.js --network scrollSepolia
+   npx hardhat ignition deploy ./ignition/modules/V2TestOracleRandomNumber.js --network scrollSepolia
+   ```
 
-## Deployment
+### Oracle Server Setup
 
-### Smart Contracts
-```bash
-cd hardhat
-npm install
-# Deploy the Oracle contract
-npx hardhat ignition deploy ./ignition/modules/Oracle.js --network scrollSepolia
-# Deploy the TestOracleRandomNumber contract
-npx hardhat ignition deploy ./ignition/modules/TestOracleRandomNumber.js --network scrollSepolia
-```
+1. Navigate to the server directory:
+   ```bash
+   cd server
+   npm install
+   ```
 
-### Oracle Server
-```bash
-cd server
-npm install
-node index.js
-```
+2. Create a `.env` file with:
+   ```
+   PRIVATE_KEY=your_oracle_wallet_private_key
+   ORACLE_CONTRACT_ADDRESS=0x48D93Bfccbb24d8cf0C968F187DC5a92c3378bee // or your deployed oracle address
+   SCROLL_RPC_URL=https://scroll-public.scroll-testnet.quiknode.pro
+   ```
 
-### Client Application
-```bash
-cd client
-npm install
-npm run dev
-```
+3. Start the oracle server:
+   ```bash
+   node index.js
+   ```
 
-## Testing
+### Client Application Setup
 
-Run tests for the smart contracts:
-```bash
-cd hardhat
-npx hardhat test
-```
+1. Navigate to the client directory:
+   ```bash
+   cd client
+   npm install
+   ```
+
+2. Create a `.env` file based on the `.env.example` template
+
+3. Start the client application:
+   ```bash
+   npm run dev
+   ```
+
+## Testing the System
+
+### Manual Testing with Test Script
 
 Test the random number generation manually:
 ```bash
@@ -113,22 +138,27 @@ cd hardhat
 node scripts/test.js
 ```
 
-## Key Addresses
+### Using the Client Application
 
-- Oracle Wallet: 0x630b8297b00Ac8b3bB7a384F85806b82EFAfa107
-- Oracle Contract: 0x48D93Bfccbb24d8cf0C968F187DC5a92c3378bee
-- Test Contract: 0x550FcE3eEb258B0d49fB31AEdBE87f8BD534747A
+1. Connect your MetaMask wallet to the application
+2. Click the "Request Random Number" button
+3. Confirm the transaction in MetaMask
+4. Wait for the oracle to fulfill the request
+5. The random number will be displayed once fulfilled
 
-## Network
+## Contract Addresses (Scroll Sepolia)
 
-This project is configured to deploy to the Scroll Sepolia testnet.
+- Oracle Contract: `0x48D93Bfccbb24d8cf0C968F187DC5a92c3378bee`
+- V2TestOracleRandomNumber: `0x125186D9fA999830Dd1160D5C51454B7aCc10e33`
+- Oracle Wallet: `0x630b8297b00Ac8b3bB7a384F85806b82EFAfa107`
 
-## Learn More
+## Security Considerations
 
-- This project uses [Hardhat](https://hardhat.org/) for Ethereum development
-- [Hardhat Ignition](https://hardhat.org/ignition) is used for deployment management
-- [Ethers.js](https://docs.ethers.org/) for blockchain interaction
+- The oracle's private key should be kept secure
+- This implementation is for educational purposes
+- For production use, consider a battle-tested solution like Chainlink VRF
 
 ## License
 
-This project is open-source and available under the MIT License.
+This project is available under the MIT License.
+```

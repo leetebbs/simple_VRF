@@ -4,6 +4,7 @@ dotenv.config();
 const alchemyKey = process.env.ALCHEMY_KEY;
 const account = process.env.P_KEY;
 const scrollKey = process.env.SCROLL_KEY;
+const etherscanKey = process.env.ETHERSCAN_KEY;
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
@@ -12,12 +13,20 @@ module.exports = {
     scrollSepolia: {
       url: `https://scroll-sepolia.g.alchemy.com/v2/${alchemyKey}`,
       accounts: [account],
+      gasPrice: 0, // critical: disables legacy gas pricing
+      maxFeePerGas: 50_000_000_000, // 50 gwei
+      maxPriorityFeePerGas: 2_000_000_000, // 2 gwei
+    },
+    sepolia: {
+      url: `https://eth-sepolia.g.alchemy.com/v2/${alchemyKey}`,
+      accounts: [account],
     },
   },
   etherscan: {
     apiKey:
     {
-      scrollSepolia: scrollKey
+      scrollSepolia: scrollKey,
+      sepolia: etherscanKey
     },
     customChains: [
       {

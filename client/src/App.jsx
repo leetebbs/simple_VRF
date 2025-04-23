@@ -10,6 +10,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [randomNumber, setRandomNumber] = useState(null);
   const [isCheckingFulfillment, setIsCheckingFulfillment] = useState(false);
+  const [lastRequestTimestamp, setLastRequestTimestamp] = useState(0);
 
   const setupContract = useCallback(async () => {
     if (!connectedAccount) return;
@@ -50,6 +51,7 @@ function App() {
     if (!contractInstance) return;
     
     try {
+      // Get the user's random number directly
       const number = await contractInstance.getRandomNumber();
       setRandomNumber(number.toString());
     } catch (error) {
@@ -93,9 +95,16 @@ function App() {
     setRandomNumber(null); // Clear any previous random number
     
     try {
+      // Request a random number and store the oracle request ID
       const tx = await contractInstance.requestRandomNumber();
-      await tx.wait();
+      const receipt = await tx.wait();
+      
+      // You could extract the request ID from events if needed
       console.log("Transaction successful:", tx.hash);
+      
+      // Store the current timestamp when the request was made
+      setLastRequestTimestamp(Date.now());
+      
       // Start polling for the random number
       await pollForRandomNumber();
     } catch (error) {

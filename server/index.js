@@ -5,12 +5,14 @@ const crypto = require("crypto");
 const express = require("express");
 const app = express();
 const privateKey = process.env.PRIVATE_KEY;// Oracle signer wallet PK - Wallet address 0x630b8297b00Ac8b3bB7a384F85806b82EFAfa107
-const contractAddress = "0x48D93Bfccbb24d8cf0C968F187DC5a92c3378bee";
+const contractAddress = "0x48D93Bfccbb24d8cf0C968F187DC5a92c3378bee"; //oracle contract address on scroll sepolia
+const sepoliaContractAddress = "0x7f18276fc5e832a60073bEAe5EcfE3C58A460187"; //oracle contract address on sepolia
 const contractABI = require("./contractABI");
-const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
-
+const provider = new ethers.JsonRpcProvider(process.env.SCROLL_RPC_URL);
+const sepoliaProvider = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL);
 // Initialize ethers.js Contract object
 const contract = new ethers.Contract(contractAddress, contractABI, provider);
+const sepoliaContract = new ethers.Contract(sepoliaContractAddress, contractABI, sepoliaProvider);
 
 // Listen for smart contract events
 function listenForRandomNumberRequests() {
