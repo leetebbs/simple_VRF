@@ -113,6 +113,9 @@ The ECDSA signature verification works as follows:
    node index.js
    ```
 
+note: to use the live version the server is deployed to render and will require waking up before use. 
+Navigate to https://simple-vrf.onrender.com/ to use the live version
+
 ### Client Application Setup
 
 1. Navigate to the client directory:
