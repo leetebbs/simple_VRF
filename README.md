@@ -120,13 +120,13 @@ Navigate to https://simple-vrf.onrender.com/ to use the live version
 
 1. Navigate to the client directory:
    ```bash
-   cd client
+   cd frontend
    npm install
    ```
 
 2. Create a `.env` file based on the `.env.example` template
 
-3. Start the client application:
+3. Start the frontend application:
    ```bash
    npm run dev
    ```
@@ -144,7 +144,7 @@ node scripts/test.js
 ### Using the Client Application
 
 1. Connect your MetaMask wallet to the application
-2. Click the "Request Random Number" button
+2. Click the "Generate Random Number" button
 3. Confirm the transaction in MetaMask
 4. Wait for the oracle to fulfill the request
 5. The random number will be displayed once fulfilled
