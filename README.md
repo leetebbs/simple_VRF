@@ -22,6 +22,9 @@ This project consists of three main components:
    - Stores the request details
    - Emits a `RandomNumberRequested` event
 
+### The server is Running on Render and may require waking up!
+### Visit https://simple-vrf.onrender.com/ to wake it up!
+
 ### Oracle Server Process
 
 # To start the oracle server visit https://simple-vrf.onrender.com/
