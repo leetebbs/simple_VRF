@@ -22,7 +22,6 @@ const RandomGenerator: React.FC = () => {
     isCheckingFulfillment,
     history,
     generateNumber: generateRandomNumber,
-    setGeneratedNumber
   } = useRandomGenerator();
   
   const handleContractReady = (contract: ethers.Contract) => {

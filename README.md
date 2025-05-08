@@ -24,6 +24,9 @@ This project consists of three main components:
 
 ### Oracle Server Process
 
+# To start the oracle server visit https://simple-vrf.onrender.com/
+# The Server is running on Render and may require waking up!!
+
 1. The oracle server (index.js) listens for `RandomNumberRequested` events
 2. When an event is detected, the server:
    - Generates a random number using `ethers.toBigInt(ethers.randomBytes(32))`

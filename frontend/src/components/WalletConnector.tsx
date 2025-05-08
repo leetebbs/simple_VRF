@@ -18,14 +18,6 @@ const SCROLL_SEPOLIA_PARAMS = {
   blockExplorerUrls: ["https://sepolia.scrollscan.com"],
 };
 
-// Helper function to get a prettier network name
-const getNetworkDisplayName = (networkName: string) => {
-  if (networkName.toLowerCase().includes('scroll') && networkName.toLowerCase().includes('sepolia')) {
-    return 'Scroll Sepolia';
-  }
-  return networkName || 'Unknown Network';
-};
-
 interface WalletConnectorProps {
   onContractReady: (contract: ethers.Contract) => void;
   isConnected: boolean;
@@ -38,10 +30,9 @@ const WalletConnector: React.FC<WalletConnectorProps> = ({
   setIsConnected 
 }) => {
   const [connectedAccount, setConnectedAccount] = useState('');
-  const [network, setNetwork] = useState('Scroll Sepolia');
+  const [network, setNetwork] = useState('Scroll Sepolia'); // Default or initial state
   const [isWrongNetwork, setIsWrongNetwork] = useState(false);
   
-  // Check if user is on the correct network
   const checkNetwork = useCallback(async () => {
     if (!(window as any).ethereum) return false;
     
@@ -99,16 +90,19 @@ const WalletConnector: React.FC<WalletConnectorProps> = ({
           const switched = await switchToScrollSepolia();
           if (!switched) {
             setIsWrongNetwork(true);
-            alert("Please switch to Scroll Sepolia network in your wallet");
+            // Keep the alert or use a more integrated UI message
+            alert("Please switch to Scroll Sepolia network in your wallet"); 
             return;
           }
+          // Re-check network after attempting switch
+          await checkNetwork(); 
         }
         
         if (accounts.length > 0) {
           setConnectedAccount(accounts[0]);
           setIsConnected(true);
-          setIsWrongNetwork(false);
-          setupContract(accounts[0]);
+          // setupContract will determine the network state
+          setupContract(accounts[0]); 
         }
       } catch (error) {
         console.error("Error connecting to wallet:", error);
@@ -119,7 +113,7 @@ const WalletConnector: React.FC<WalletConnectorProps> = ({
   };
   
   const setupContract = useCallback(async (account: string) => {
-    if (!account) return;
+    if (!account || !(window as any).ethereum) return;
     
     try {
       const provider = new ethers.BrowserProvider((window as any).ethereum);
@@ -127,16 +121,28 @@ const WalletConnector: React.FC<WalletConnectorProps> = ({
       const contract = new ethers.Contract(testContractAddress, abi, signer);
       onContractReady(contract);
       
-      const network = await provider.getNetwork();
-      const chainId = await (window as any).ethereum.request({ method: 'eth_chainId' });
+      const networkInfo = await provider.getNetwork();
+      const currentChainId = await (window as any).ethereum.request({ method: 'eth_chainId' });
     
-      // Set the network name with chainId
-      const networkName = getNetworkDisplayName(network.name || 'Unknown');
-      setNetwork(`${networkName} (${parseInt(chainId, 16)})`);
+      let networkDisplayName = 'Unknown Network';
+      // Check if the current chainId matches Scroll Sepolia
+      if (currentChainId === SCROLL_SEPOLIA_CHAIN_ID) {
+        networkDisplayName = 'Scroll Sepolia';
+        setIsWrongNetwork(false); // Ensure wrong network flag is false
+      } else {
+        // Use the name from the provider if available, otherwise keep 'Unknown'
+        networkDisplayName = networkInfo.name && networkInfo.name !== 'unknown' ? networkInfo.name : 'Unknown Network';
+        setIsWrongNetwork(true); // Set wrong network flag
+      }
+      
+      // Set the network display string including the decimal chain ID
+      setNetwork(`${networkDisplayName} (${parseInt(currentChainId, 16)})`);
+      
     } catch (error) {
       console.error("Error setting up contract:", error);
+      // Optionally handle UI state for error (e.g., setNetwork('Error'), setIsWrongNetwork(true))
     }
-  }, [onContractReady]);
+  }, [onContractReady]); // Removed setIsConnected from dependencies as it's handled elsewhere
   
   useEffect(() => {
     if (connectedAccount) {
@@ -148,28 +154,37 @@ const WalletConnector: React.FC<WalletConnectorProps> = ({
   useEffect(() => {
     if ((window as any).ethereum) {
       const handleChainChanged = (chainId: string) => {
+        console.log("Chain changed to:", chainId);
         const isCorrect = chainId === SCROLL_SEPOLIA_CHAIN_ID;
         setIsWrongNetwork(!isCorrect);
         
-        if (!isCorrect) {
-          setIsConnected(false);
-        } else if (connectedAccount) {
-          setupContract(connectedAccount);
+        if (connectedAccount) {
+           // Re-run setupContract to update network name and potentially the contract instance
+           setupContract(connectedAccount); 
+        } else {
+           // If not connected, just update the wrong network flag
+           setIsWrongNetwork(!isCorrect); 
         }
+         // Update connection status based on network correctness
+        setIsConnected(isCorrect && !!connectedAccount);
       };
       
       // Subscribe to chainChanged events
       (window as any).ethereum.on('chainChanged', handleChainChanged);
       
-      // Check network on initial load
-      checkNetwork();
+      // Check network on initial load if already connected potentially
+      if (connectedAccount) {
+        checkNetwork();
+      }
       
       // Cleanup
       return () => {
-        (window as any).ethereum.removeListener('chainChanged', handleChainChanged);
+        if ((window as any).ethereum.removeListener) { // Check if removeListener exists
+           (window as any).ethereum.removeListener('chainChanged', handleChainChanged);
+        }
       };
     }
-  }, [checkNetwork, connectedAccount, setIsConnected, setupContract]);
+  }, [checkNetwork, connectedAccount, setupContract, setIsConnected]); // Added setIsConnected dependency
   
   return (
     <Card>
@@ -177,6 +192,7 @@ const WalletConnector: React.FC<WalletConnectorProps> = ({
         <h2 className="text-2xl font-semibold mb-2">Network Status</h2>
         <div className="space-y-3">
           <div className="flex items-center">
+            {/* Status Indicator Logic */}
             <div className={`w-3 h-3 rounded-full mr-2 ${isConnected && !isWrongNetwork ? 'bg-green-500' : 'bg-red-500'}`}></div>
             <span className="text-sm text-slate-300">
               {isConnected && !isWrongNetwork 
@@ -187,17 +203,17 @@ const WalletConnector: React.FC<WalletConnectorProps> = ({
             </span>
           </div>
           
-          {isConnected ? (
+          {connectedAccount ? ( // Show details if an account is set, regardless of connection status flag
             <>
               <div className="py-1 px-3 bg-navy-800 rounded-md text-sm">
                 <p className="text-slate-400 text-xs">Account</p>
                 <p className="font-mono">{connectedAccount.slice(0, 6)}...{connectedAccount.slice(-4)}</p>
               </div>
-              <div className={`py-1 px-3 ${isWrongNetwork ? 'bg-red-900/30' : 'bg-navy-800'} rounded-md text-sm`}>
+              <div className={`py-1 px-3 ${isWrongNetwork ? 'bg-red-900/30 border border-red-700' : 'bg-navy-800'} rounded-md text-sm`}>
                 <p className="text-slate-400 text-xs">Network</p>
                 <p className="flex items-center">
                   {isWrongNetwork ? (
-                    'Switch to Scroll Sepolia'
+                     <span className="text-red-400">{network}</span> // Show the actual wrong network
                   ) : (
                     <>
                       <span className="w-2 h-2 rounded-full bg-green-500 mr-2"></span>
@@ -211,14 +227,15 @@ const WalletConnector: React.FC<WalletConnectorProps> = ({
                 <div className="py-2">
                   <Button 
                     onClick={switchToScrollSepolia} 
-                    className="w-full bg-red-500 hover:bg-red-600"
+                    className="w-full bg-red-600 hover:bg-red-700" // Slightly darker red
                   >
-                    Switch Network
+                    Switch to Scroll Sepolia
                   </Button>
                 </div>
               )}
             </>
           ) : (
+            // Show Connect button only if no account is connected
             <div className="py-4">
               <Button 
                 onClick={connectWallet} 
