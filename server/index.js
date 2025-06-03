@@ -19,6 +19,10 @@ let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_INTERVAL = 30000; // 30 seconds
 
+app.get("/", (req, res) => {
+  res.send("Server is running!");
+});
+
 // Initialize providers and contracts
 function initializeConnections() {
   try {
