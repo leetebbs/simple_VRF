@@ -64,15 +64,26 @@ function setupEventListeners() {
       }
     };
 
-    // Set up the event listener
+    // Set up the event listener with error handling
     contract.on("RandomNumberRequested", eventListener);
     console.log("Event listeners set up successfully");
     
     // Set up error handlers for the provider
     provider.on("error", (error) => {
       console.error("Provider error:", error);
-      handleReconnect();
+      if (error.message && error.message.includes("filter not found")) {
+        console.log("Filter expired, refreshing...");
+        setupEventListeners();
+      } else {
+        handleReconnect();
+      }
     });
+
+    // Add block listener to keep connection alive
+    provider.on("block", () => {
+      // This helps keep the connection alive
+    });
+
   } catch (error) {
     console.error("Failed to set up event listeners:", error);
     handleReconnect();
@@ -150,10 +161,15 @@ initializeConnections();
 setupEventListeners();
 
 // Set up a periodic reconnection to prevent filter expiration
-const FILTER_REFRESH_INTERVAL = 4 * 60 * 1000; // 4 minutes (filters typically expire after 5)
+const FILTER_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes (reduced from 4 to be more proactive)
 setInterval(() => {
   console.log("Refreshing event filters...");
-  setupEventListeners();
+  try {
+    setupEventListeners();
+  } catch (error) {
+    console.error("Error during filter refresh:", error);
+    handleReconnect();
+  }
 }, FILTER_REFRESH_INTERVAL);
 
 // Express server setup
