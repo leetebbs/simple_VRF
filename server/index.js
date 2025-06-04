@@ -24,24 +24,42 @@ app.get("/", (req, res) => {
 });
 
 // Initialize providers and contracts
-function initializeConnections() {
+async function initializeConnections() {
   try {
-    provider = new ethers.JsonRpcProvider(process.env.SCROLL_RPC_URL);
-    sepoliaProvider = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL);
+    // Use HTTP RPC providers for more reliable connections
+    const scrollRpcUrl = process.env.SCROLL_RPC_URL;
+    const sepoliaRpcUrl = process.env.SEPOLIA_RPC_URL;
+
+    if (!scrollRpcUrl || !sepoliaRpcUrl) {
+      throw new Error("RPC URLs not configured in environment variables");
+    }
+
+    console.log("Initializing HTTP RPC providers...");
+    provider = new ethers.JsonRpcProvider(scrollRpcUrl);
+    sepoliaProvider = new ethers.JsonRpcProvider(sepoliaRpcUrl);
+    
+    // Wait for providers to be ready
+    console.log("Waiting for Scroll provider to be ready...");
+    await provider.ready;
+    console.log("Scroll provider is ready");
+    
+    console.log("Waiting for Sepolia provider to be ready...");
+    await sepoliaProvider.ready;
+    console.log("Sepolia provider is ready");
     
     contract = new ethers.Contract(contractAddress, contractABI, provider);
     sepoliaContract = new ethers.Contract(sepoliaContractAddress, contractABI, sepoliaProvider);
     
-    console.log("Connections initialized successfully");
+    console.log("RPC connections initialized successfully");
     reconnectAttempts = 0; // Reset reconnect counter on successful connection
   } catch (error) {
-    console.error("Failed to initialize connections:", error);
+    console.error("Failed to initialize RPC connections:", error);
     handleReconnect();
   }
 }
 
 // Set up event listeners with error handling
-function setupEventListeners() {
+async function setupEventListeners() {
   try {
     // Remove any existing listeners to prevent duplicates
     if (eventListener) {
@@ -69,24 +87,44 @@ function setupEventListeners() {
     };
 
     // Set up the event listener with error handling
-    contract.on("RandomNumberRequested", eventListener);
-    console.log("Event listeners set up successfully");
-    
-    // Set up error handlers for the provider
-    provider.on("error", (error) => {
-      console.error("Provider error:", error);
-      if (error.message && error.message.includes("filter not found")) {
-        console.log("Filter expired, refreshing...");
-        setupEventListeners();
-      } else {
-        handleReconnect();
-      }
-    });
-
-    // Add block listener to keep connection alive
-    provider.on("block", () => {
-      // This helps keep the connection alive
-    });
+    try {
+      console.log("Setting up event listener for RandomNumberRequested...");
+      
+      // Use a polling approach with HTTP RPC
+      const pollInterval = setInterval(async () => {
+        try {
+          const filter = {
+            address: contractAddress,
+            topics: [ethers.id("RandomNumberRequested(uint256,address)")]
+          };
+          
+          const logs = await provider.getLogs(filter);
+          
+          for (const log of logs) {
+            const parsedLog = contract.interface.parseLog(log);
+            if (parsedLog) {
+              const [requestId, requester] = parsedLog.args;
+              await eventListener(requestId, requester);
+            }
+          }
+        } catch (error) {
+          console.error("Error polling for events:", error);
+          if (error.message && error.message.includes("401")) {
+            console.error("Authentication error while polling events");
+            clearInterval(pollInterval);
+            handleReconnect();
+          }
+        }
+      }, 10000); // Poll every 10 seconds
+      
+      // Store the interval ID for cleanup
+      provider.pollInterval = pollInterval;
+      
+      console.log("Event polling set up successfully");
+    } catch (error) {
+      console.error("Error setting up event polling:", error);
+      throw error; // Re-throw to trigger reconnection
+    }
 
   } catch (error) {
     console.error("Failed to set up event listeners:", error);
@@ -95,7 +133,7 @@ function setupEventListeners() {
 }
 
 // Handle reconnection logic
-function handleReconnect() {
+async function handleReconnect() {
   if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
     console.error(`Maximum reconnection attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Please check your configuration.`);
     return;
@@ -104,10 +142,10 @@ function handleReconnect() {
   reconnectAttempts++;
   console.log(`Attempting to reconnect (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) in ${RECONNECT_INTERVAL/1000} seconds...`);
   
-  setTimeout(() => {
+  setTimeout(async () => {
     console.log("Reinitializing connections...");
-    initializeConnections();
-    setupEventListeners();
+    await initializeConnections();
+    await setupEventListeners();
   }, RECONNECT_INTERVAL);
 }
 
@@ -161,20 +199,14 @@ async function signRandomNumber(requestId, randomNumber, privateKey) {
 }
 
 // Initialize the system
-initializeConnections();
-setupEventListeners();
-
-// Set up a periodic reconnection to prevent filter expiration
-const FILTER_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes (reduced from 4 to be more proactive)
-setInterval(() => {
-  console.log("Refreshing event filters...");
+(async () => {
   try {
-    setupEventListeners();
+    await initializeConnections();
+    await setupEventListeners();
   } catch (error) {
-    console.error("Error during filter refresh:", error);
-    handleReconnect();
+    console.error("Failed to initialize system:", error);
   }
-}, FILTER_REFRESH_INTERVAL);
+})();
 
 // Express server setup
 const server = app.listen(3000, () => {
@@ -190,6 +222,26 @@ function gracefulShutdown() {
   // Remove event listeners
   if (eventListener) {
     contract.removeListener("RandomNumberRequested", eventListener);
+  }
+  
+  // Clear intervals
+  if (provider) {
+    if (provider.pollInterval) {
+      clearInterval(provider.pollInterval);
+    }
+  }
+  if (sepoliaProvider) {
+    if (sepoliaProvider.pollInterval) {
+      clearInterval(sepoliaProvider.pollInterval);
+    }
+  }
+  
+  // Close WebSocket connections
+  if (provider) {
+    provider.destroy();
+  }
+  if (sepoliaProvider) {
+    sepoliaProvider.destroy();
   }
   
   // Close the server
